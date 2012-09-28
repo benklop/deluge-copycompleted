@@ -1,7 +1,7 @@
 #
 # gtkui.py
 #
-# Copyright (C) 2009 Calum Lind <calumlind@gmail.com>
+# Copyright (C) 2012 Calum Lind <calumlind@gmail.com>
 #
 # Basic plugin template created by:
 # Copyright (C) 2008 Martijn Voncken <mvoncken@gmail.com>
@@ -70,9 +70,16 @@ class GtkUI(GtkPluginBase):
         else:
             path = self.glade.get_widget("entry_path").get_text()
 
+        umask = ''.join(map(str, [
+            0,
+            self.glade.get_widget("spinbutton_umask1").get_value_as_int(),
+            self.glade.get_widget("spinbutton_umask2").get_value_as_int(),
+            self.glade.get_widget("spinbutton_umask3").get_value_as_int()
+            ]))
+
         config = {
             "copy_to": path,
-            "umask": self.glade.get_widget("entry_umask").get_text(),
+            "umask": umask,
         }
 
         client.copycompleted.set_config(config)
@@ -91,6 +98,9 @@ class GtkUI(GtkPluginBase):
             else:
                 self.glade.get_widget("entry_path").set_text(config["copy_to"])
 
-            self.glade.get_widget("entry_umask").set_text(config["umask"])
+            umask = map(int, str(config["umask"]))
+            self.glade.get_widget("spinbutton_umask1").set_value(umask[1])
+            self.glade.get_widget("spinbutton_umask2").set_value(umask[2])
+            self.glade.get_widget("spinbutton_umask3").set_value(umask[3])
 
         client.copycompleted.get_config().addCallback(on_get_config)
