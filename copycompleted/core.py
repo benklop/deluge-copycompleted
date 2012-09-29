@@ -52,7 +52,8 @@ from twisted.internet import reactor
 
 DEFAULT_PREFS = {
     "copy_to" : "",
-    "umask" : ""
+    "umask" : "",
+    "move_to": False
 }
 
 class TorrentCopiedEvent(DelugeEvent):
@@ -80,6 +81,7 @@ class Core(CorePluginBase):
 
         # Get notified when a torrent finishes downloading
         component.get("EventManager").register_event_handler("TorrentFinishedEvent", self.on_torrent_finished)
+        component.get("EventManager").register_event_handler("TorrentCopiedEvent", self.on_torrent_copied)
 
     def disable(self):
         try:
@@ -103,14 +105,37 @@ class Core(CorePluginBase):
         new_path = self.config["copy_to"]
         files = torrent.get_files()
         umask = self.config["umask"]
-        
+
         # validate parameters
         if new_path.strip() == "" or not os.path.isdir(new_path):
             log.error("COPYCOMPLETED: No path to copy to was specified, or that path was invalid. Copy aborted.")
             return
-        
-        log.info("COPYCOMPLETED: Copying %s from %s to %s" % (info["name"], old_path, new_path)) 
+
+        log.info("COPYCOMPLETED: Copying %s from %s to %s" % (info["name"], old_path, new_path))
         thread.start_new_thread(Core._thread_copy, (torrent_id, old_path, new_path, files, umask))
+
+    def on_torrent_copied(self, torrent_id, old_path, new_path, path_pairs):
+        """
+        Remove old path if option enabled
+        """
+        log.debug("COPYCOMPLETED: Torrent Copied Event: %s, %s, %s, %s", torrent_id, old_path, new_path, path_pairs)
+        if self.config["move_to"]:
+            log.debug("COPYCOMPLETED: Attempting Move To Path")
+            torrent = component.get("TorrentManager").torrents[torrent_id]
+            files = torrent.get_files()
+            torrent.pause()
+            for old,new in path_pairs:
+                try:
+                    if os.path.exists(new):
+                        os.remove(old)
+                    else:
+                        log.error("COPYCOMPLETED: %s missing new location files. Skipping." % f["path"])
+                        return
+
+                except Exception, e:
+                    os.error("COPYCOMPLETED: Could not copy file.\n%s" % str(e))
+            torrent.move_storage(new_path)
+            torrent.resume()
 
     @staticmethod
     def _thread_copy(torrent_id, old_path, new_path, files, umask):
@@ -119,7 +144,7 @@ class Core(CorePluginBase):
             log.debug("COPYCOMPLETED: Applying new umask of octal %s" % umask)
             new_umask = int(umask, 8)
             old_umask = os.umask(new_umask)
-        
+
         path_pairs = [ ]
         for f in files:
             try:
@@ -161,7 +186,7 @@ class Core(CorePluginBase):
             os.umask(old_umask)
 
         component.get("EventManager").emit(TorrentCopiedEvent(torrent_id, old_path, new_path, path_pairs))
-            
+
     @export()
     def set_config(self, config):
         "sets the config dictionary"

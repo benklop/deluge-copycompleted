@@ -49,9 +49,7 @@ from common import get_resource
 
 class GtkUI(GtkPluginBase):
     def enable(self):
-        log.error("cc plugin enabled")
         self.glade = gtk.glade.XML(get_resource("copycompleted_prefs.glade"))
-        log.error("cc plugin enabled")
         component.get("Preferences").add_page("Copy Completed", self.glade.get_widget("copycompleted_prefs_box"))
         component.get("PluginManager").register_hook("on_apply_prefs", self.on_apply_prefs)
         component.get("PluginManager").register_hook("on_show_prefs", self.on_show_prefs)
@@ -64,7 +62,7 @@ class GtkUI(GtkPluginBase):
         del self.glade
 
     def on_apply_prefs(self):
-        log.debug("applying prefs for Copy Completed")
+        log.debug("Applying prefs for Copy Completed")
         if client.is_localhost():
             path = self.glade.get_widget("folderchooser_path").get_current_folder()
         else:
@@ -80,6 +78,7 @@ class GtkUI(GtkPluginBase):
         config = {
             "copy_to": path,
             "umask": umask,
+            "move_to": self.glade.get_widget("radiobutton_move_to").get_active()
         }
 
         client.copycompleted.set_config(config)
@@ -98,9 +97,11 @@ class GtkUI(GtkPluginBase):
             else:
                 self.glade.get_widget("entry_path").set_text(config["copy_to"])
 
+
             umask = map(int, str(config["umask"]))
             self.glade.get_widget("spinbutton_umask1").set_value(umask[1])
             self.glade.get_widget("spinbutton_umask2").set_value(umask[2])
             self.glade.get_widget("spinbutton_umask3").set_value(umask[3])
+            self.glade.get_widget("radiobutton_move_to").set_active(config["move_to"])
 
         client.copycompleted.get_config().addCallback(on_get_config)
