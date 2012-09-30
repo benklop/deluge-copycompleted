@@ -111,7 +111,7 @@ class Core(CorePluginBase):
             log.error("COPYCOMPLETED: No path to copy to was specified, or that path was invalid. Copy aborted.")
             return
 
-        log.info("COPYCOMPLETED: Copying %s from %s to %s", (info["name"], old_path, new_path))
+        log.info("COPYCOMPLETED: Copying %s from %s to %s", info["name"], old_path, new_path)
         thread.start_new_thread(Core._thread_copy, (torrent_id, old_path, new_path, files, umask))
 
     def on_torrent_copied(self, torrent_id, old_path, new_path, path_pairs):
@@ -119,18 +119,18 @@ class Core(CorePluginBase):
         Remove old path if option enabled
         """
         log.debug("COPYCOMPLETED: Torrent Copied Event: %s, %s, %s, %s", torrent_id, old_path, new_path, path_pairs)
-        if self.config["move_to"]:
+        if self.config["move_to"] and path_pairs:
             log.debug("COPYCOMPLETED: Attempting Move To Path")
             torrent = component.get("TorrentManager").torrents[torrent_id]
             files = torrent.get_files()
             torrent.pause()
-            old_fp_dir=[]
+            old_fp_dirs=[]
             for old_fp,new_fp in path_pairs:
                 try:
                     if os.path.exists(new_fp):
                         log.debug("COPYCOMPLETED: Removing files: %s", old_fp)
                         os.remove(old_fp)
-                        old_fp_dir.append(os.dirname(old_fp))
+                        old_fp_dirs.append(os.path.dirname(old_fp))
                     else:
                         log.error("COPYCOMPLETED: %s missing new location files. Skipping.", new_fp)
                         break
@@ -139,12 +139,14 @@ class Core(CorePluginBase):
                     break
             else:
                 # Clean up empty dirs
+                old_fp_dirs = list(set(old_fp_dirs))
+                log.debug("COPYCOMPLETED: Cleanup empty dirs: %s", old_fp_dirs)
                 try:
-                    for d in old_fp_dir:
-                        if os.path.isdir(d):
-                                os.removedirs(d)
+                    for old_fp_dir in old_fp_dirs:
+                        if os.path.isdir(old_fp_dir):
+                                os.removedirs(old_fp_dir)
                 except OSError, e:
-                    log.error("COPYCOMPLETED: Error with %s: %s", old_fp_dir, e)
+                    log.error("COPYCOMPLETED: Error with removing dirs: %s", e)
                 else:
                     if not torrent.move_storage(new_path):
                         log.error("COPYCOMPLETED: Move Storage failed")
@@ -175,7 +177,7 @@ class Core(CorePluginBase):
                     log.info("COPYCOMPLETED: %s already exists in the destination. Skipping.", f["path"])
                     break
 
-                log.info("COPYCOMPLETED: Copying %s to %s" % (old_file_path, new_file_path))
+                log.info("COPYCOMPLETED: Copying %s to %s", old_file_path, new_file_path)
 
                 # ensure dirs up to this exist
                 if not os.path.exists(os.path.dirname(new_file_path)):
