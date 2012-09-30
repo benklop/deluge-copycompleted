@@ -110,7 +110,7 @@
                         <property name="can_focus">True</property>
                         <property name="receives_default">False</property>
                         <property name="has_tooltip">True</property>
-                        <property name="tooltip" translatable="yes">Avoids transfer speed drop normally associated with Move Storage</property>
+                        <property name="tooltip" translatable="yes">Avoids network speed drop normally associated with Move Storage</property>
                         <property name="use_action_appearance">False</property>
                         <property name="active">True</property>
                         <property name="draw_indicator">True</property>

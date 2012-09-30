@@ -139,7 +139,7 @@ class Core(CorePluginBase):
                     break
             else:
                 # Clean up empty dirs
-                old_fp_dirs = list(set(old_fp_dirs))
+                old_fp_dirs = sorted(list(set(old_fp_dirs)), key=len, reverse=True)
                 log.debug("COPYCOMPLETED: Cleanup empty dirs: %s", old_fp_dirs)
                 try:
                     for old_fp_dir in old_fp_dirs:
