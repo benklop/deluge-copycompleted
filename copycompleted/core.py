@@ -111,7 +111,7 @@ class Core(CorePluginBase):
             log.error("COPYCOMPLETED: No path to copy to was specified, or that path was invalid. Copy aborted.")
             return
 
-        log.info("COPYCOMPLETED: Copying %s from %s to %s" % (info["name"], old_path, new_path))
+        log.info("COPYCOMPLETED: Copying %s from %s to %s", (info["name"], old_path, new_path))
         thread.start_new_thread(Core._thread_copy, (torrent_id, old_path, new_path, files, umask))
 
     def on_torrent_copied(self, torrent_id, old_path, new_path, path_pairs):
@@ -124,24 +124,38 @@ class Core(CorePluginBase):
             torrent = component.get("TorrentManager").torrents[torrent_id]
             files = torrent.get_files()
             torrent.pause()
-            for old,new in path_pairs:
+            old_fp_dir=[]
+            for old_fp,new_fp in path_pairs:
                 try:
-                    if os.path.exists(new):
-                        os.remove(old)
+                    if os.path.exists(new_fp):
+                        log.debug("COPYCOMPLETED: Removing files: %s", old_fp)
+                        os.remove(old_fp)
+                        old_fp_dir.append(os.dirname(old_fp))
                     else:
-                        log.error("COPYCOMPLETED: %s missing new location files. Skipping." % f["path"])
-                        return
-
+                        log.error("COPYCOMPLETED: %s missing new location files. Skipping.", new_fp)
+                        break
                 except Exception, e:
-                    os.error("COPYCOMPLETED: Could not copy file.\n%s" % str(e))
-            torrent.move_storage(new_path)
+                    log.error("COPYCOMPLETED: Could not remove file.\n%s", e)
+                    break
+            else:
+                # Clean up empty dirs
+                try:
+                    for d in old_fp_dir:
+                        if os.path.isdir(d):
+                                os.removedirs(d)
+                except OSError, e:
+                    log.error("COPYCOMPLETED: Error with %s: %s", old_fp_dir, e)
+                else:
+                    if not torrent.move_storage(new_path):
+                        log.error("COPYCOMPLETED: Move Storage failed")
+
             torrent.resume()
 
     @staticmethod
     def _thread_copy(torrent_id, old_path, new_path, files, umask):
         # apply different umask if available
         if umask:
-            log.debug("COPYCOMPLETED: Applying new umask of octal %s" % umask)
+            log.debug("COPYCOMPLETED: Applying new umask of octal %s", umask)
             new_umask = int(umask, 8)
             old_umask = os.umask(new_umask)
 
@@ -153,12 +167,12 @@ class Core(CorePluginBase):
 
                 # check that this file exists at the current location
                 if not os.path.exists(old_file_path):
-                    log.debug("COPYCOMPLETED: %s was not downloaded. Skipping." % f["path"])
+                    log.debug("COPYCOMPLETED: %s was not downloaded. Skipping.", f["path"])
                     break
 
                 # check that this file doesn't already exist at the new location
                 if os.path.exists(new_file_path):
-                    log.info("COPYCOMPLETED: %s already exists in the destination. Skipping." % f["path"])
+                    log.info("COPYCOMPLETED: %s already exists in the destination. Skipping.", f["path"])
                     break
 
                 log.info("COPYCOMPLETED: Copying %s to %s" % (old_file_path, new_file_path))
@@ -178,7 +192,7 @@ class Core(CorePluginBase):
                 path_pairs.append(( old_file_path, new_file_path ))
 
             except Exception, e:
-                os.error("COPYCOMPLETED: Could not copy file.\n%s" % str(e))
+                os.error("COPYCOMPLETED: Could not copy file.\n%s", e)
 
         # revert new umask
         if umask:
