@@ -82,6 +82,8 @@ class Core(CorePluginBase):
         # Get notified when a torrent finishes downloading
         component.get("EventManager").register_event_handler("TorrentFinishedEvent", self.on_torrent_finished)
         component.get("EventManager").register_event_handler("TorrentCopiedEvent", self.on_torrent_copied)
+        component.get("AlertManager").register_event_handler("performance_alert", self.on_alert_performance)
+        self.session = component.get("Core").session
 
     def disable(self):
         try:
@@ -89,6 +91,8 @@ class Core(CorePluginBase):
         except:
             pass
         component.get("EventManager").deregister_event_handler("TorrentFinishedEvent", self.on_torrent_finished)
+        component.get("EventManager").deregister_event_handler("TorrentCopiedEvent", self.on_torrent_copied)
+        component.get("AlertManager").deregister_event_handler("performance_alert", self.on_alert_performance)
 
     def update(self):
         pass
@@ -152,6 +156,24 @@ class Core(CorePluginBase):
                         log.error("COPYCOMPLETED: Move Storage failed")
 
             torrent.resume()
+
+    def on_alert_perfomance(self, alert):
+        log.debug("COPYCOMPLETED: Performance Alert: %s", alert.message())
+        if 'send buffer watermark too low' in alert.message():
+            try:
+                send_buffer_watermark = self.session.settings().send_buffer_watermark
+                log.debug("COPYCOMPLETED: send_buffer_watermark currently set to: %s bytes", send_buffer_watermark)
+                # Cap the buffer at 5MiB, based upon lt high_performance settings
+                buffer_cap = 5 * 1024 * 1024
+                # if send buffer is too small, try doubling its size
+                if settings.send_buffer_watermark <= buffer_cap
+                    log.debug("COPYCOMPLETED: Setting send_buffer_watermark to: %s bytes", 2 * send_buffer_watermark)
+                    setattr(settings, "send_buffer_watermark", 2 * send_buffer_watermark)
+                    self.session.set_settings(settings)
+                else:
+                    log.debug("COPYCOMPLETED: send_buffer_watermark has hit buffer cap: %s bytes", buffer_cap)
+            except:
+                return
 
     @staticmethod
     def _thread_copy(torrent_id, old_path, new_path, files, umask):
