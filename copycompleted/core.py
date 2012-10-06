@@ -162,12 +162,13 @@ class Core(CorePluginBase):
         log.debug("COPYCOMPLETED: Performance Alert: %s", alert.message())
         if 'send buffer watermark too low' in alert.message():
             try:
-                send_buffer_watermark = self.session.settings().send_buffer_watermark
+                settings = self.session.settings()
+                send_buffer_watermark = settings.send_buffer_watermark
                 log.debug("COPYCOMPLETED: send_buffer_watermark currently set to: %s bytes", send_buffer_watermark)
                 # Cap the buffer at 5MiB, based upon lt high_performance settings
                 buffer_cap = 5 * 1024 * 1024
                 # if send buffer is too small, try doubling its size
-                if settings.send_buffer_watermark <= buffer_cap:
+                if send_buffer_watermark <= buffer_cap:
                     log.debug("COPYCOMPLETED: Setting send_buffer_watermark to: %s bytes", 2 * send_buffer_watermark)
                     setattr(settings, "send_buffer_watermark", 2 * send_buffer_watermark)
                     self.session.set_settings(settings)
