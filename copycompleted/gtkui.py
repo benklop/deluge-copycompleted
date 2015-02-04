@@ -1,6 +1,7 @@
 #
 # gtkui.py
 #
+# Copyright (C) 2015 Ben Klopfenstein <benklop@gmail.com>
 # Copyright (C) 2012 Calum Lind <calumlind@gmail.com>
 #
 # Basic plugin template created by:
@@ -75,10 +76,14 @@ class GtkUI(GtkPluginBase):
             self.glade.get_widget("spinbutton_umask3").get_value_as_int()
             ]))
 
-        config = {
+        label = {
             "copy_to": path,
             "umask": umask,
             "move_to": self.glade.get_widget("radiobutton_move_to").get_active()
+        }
+        
+        config = {
+            "No Label": label,
         }
 
         client.copycompleted.set_config(config)
@@ -92,16 +97,18 @@ class GtkUI(GtkPluginBase):
             self.glade.get_widget("entry_path").show()
 
         def on_get_config(config):
+            label = config["No Label"]
+            
             if client.is_localhost():
-                self.glade.get_widget("folderchooser_path").set_current_folder(config["copy_to"])
+                self.glade.get_widget("folderchooser_path").set_current_folder(label["copy_to"])
             else:
-                self.glade.get_widget("entry_path").set_text(config["copy_to"])
+                self.glade.get_widget("entry_path").set_text(label["copy_to"])
 
 
-            umask = map(int, str(config["umask"]))
+            umask = map(int, str(label["umask"]))
             self.glade.get_widget("spinbutton_umask1").set_value(umask[1])
             self.glade.get_widget("spinbutton_umask2").set_value(umask[2])
             self.glade.get_widget("spinbutton_umask3").set_value(umask[3])
-            self.glade.get_widget("radiobutton_move_to").set_active(config["move_to"])
+            self.glade.get_widget("radiobutton_move_to").set_active(label["move_to"])
 
         client.copycompleted.get_config().addCallback(on_get_config)

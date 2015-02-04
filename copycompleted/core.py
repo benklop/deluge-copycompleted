@@ -1,6 +1,7 @@
 #
 # core.py
 #
+# Copyright (C) 2015 Ben Klopfenstein <benklop@gmail.com>
 # Copyright (C) 2010 Sam Lai <sam@edgylogic.com>
 # Copyright (C) 2009 Andrew Resch <andrewresch@gmail.com>
 #
@@ -51,10 +52,23 @@ from deluge.event import DelugeEvent
 from twisted.internet import reactor
 
 DEFAULT_PREFS = {
+    "labels":{
+        "No Label":{
+            "copy_to" : "",
+            "umask" : "",
+            "move_to": False
+        },
+      
+    }, #label_id:{name:value}
+}
+
+OPTIONS_DEFAULTS = {
     "copy_to" : "",
     "umask" : "",
     "move_to": False
 }
+
+NO_LABEL = "No Label"
 
 class TorrentCopiedEvent(DelugeEvent):
     """
@@ -98,6 +112,56 @@ class Core(CorePluginBase):
     def update(self):
         pass
 
+    ## Utils ##
+    def clean_config(self):
+        """remove invalid data from config-file"""
+        for torrent_id, label_id in list(self.torrent_labels.iteritems()):
+            if (not label_id in self.labels) or (not torrent_id in self.torrents):
+                log.debug("label: rm %s:%s" % (torrent_id,label_id))
+                del self.torrent_labels[torrent_id]
+
+    def clean_initial_config(self):
+        """
+        *add any new keys in OPTIONS_DEFAULTS
+        *set all None values to default <-fix development config
+        """
+        log.debug(self.labels.keys())
+        for key in self.labels.keys():
+            options = dict(OPTIONS_DEFAULTS)
+            options.update(self.labels[key])
+            self.labels[key] = options
+
+        for label, options in self.labels.items():
+            for key, value in options.items():
+                if value == None:
+                    self.labels[label][key] = OPTIONS_DEFAULTS[key]
+
+    def save_config(self):
+        self.clean_config()
+        self.config.save()
+
+    @export
+    def add(self, label_id):
+        """add a torrent copy event
+        see label_set_options for more options.
+        """
+        label_id = label_id.lower()
+        CheckInput(RE_VALID.match(label_id) , _("Invalid label, valid characters:[a-z0-9_-]"))
+        CheckInput(label_id, _("Empty Label"))
+        CheckInput(not (label_id in self.labels) , _("Label already exists"))
+
+        self.labels[label_id] = dict(OPTIONS_DEFAULTS)
+        
+        self.config.save()
+
+    @export
+    def remove(self, label_id):
+        """remove a label"""
+        CheckInput(label_id in self.labels, _("Unknown Label"))
+        del self.labels[label_id]
+        self.clean_config()
+        self.config.save()
+
     def on_torrent_finished(self, torrent_id):
         """
         Copy the torrent now. It will do this in a separate thread to avoid
@@ -105,17 +169,26 @@ class Core(CorePluginBase):
         web/gtk UI.)
         """
         torrent = component.get("TorrentManager").torrents[torrent_id]
+        
+        if 'Label' in component.get("CorePluginManager").get_enabled_plugins():
+            label = component.get("CorePlugin.Label")
+            if label.torrent_label[torrent_id] != "":
+                label_id = label._status_get_label(torrent_id)
+        if label_id == "":
+            label_id = NO_LABEL
+        options = self.labels[label_id]
+        
         info = torrent.get_status([ "name", "save_path", "move_on_completed", "move_on_completed_path" ])
         old_path = info["move_on_completed_path"] if info["move_on_completed"] else info["save_path"]
-        new_path = self.config["copy_to"]
+        new_path = options["copy_to"]
         files = torrent.get_files()
-        umask = self.config["umask"]
-
+        umask = options["umask"]
+        
         # validate parameters
         if new_path.strip() == "" or not os.path.isdir(new_path):
             log.error("COPYCOMPLETED: No path to copy to was specified, or that path was invalid. Copy aborted.")
             return
-
+        
         log.info("COPYCOMPLETED: Copying %s from %s to %s", info["name"], old_path, new_path)
         thread.start_new_thread(Core._thread_copy, (torrent_id, old_path, new_path, files, umask))
 

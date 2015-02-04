@@ -251,9 +251,10 @@ Deluge.ux.preferences.CopyCompletedPage = Ext.extend(Ext.Panel, {
 	onApply: function() {
 		// build settings object
 		var config = { }
-		
-		config['copy_to'] = this.copyTo.getValue();
-		config['umask'] = this.umask.getValue();
+		var label = { }
+		label['copy_to'] = this.copyTo.getValue();
+		label['umask'] = this.umask.getValue();
+                config['No Label'] = label;
 		
 		deluge.client.copycompleted.set_config(config);
 	},
@@ -266,8 +267,9 @@ Deluge.ux.preferences.CopyCompletedPage = Ext.extend(Ext.Panel, {
 	updateConfig: function() {
 		deluge.client.copycompleted.get_config({
 			success: function(config) {
-				this.copyTo.setValue(config['copy_to']);
-				this.umask.setValue(config['umask']);
+                                var label = config['No Label'];
+				this.copyTo.setValue(label['copy_to']);
+				this.umask.setValue(label['umask']);
 			},
 			scope: this
 		});
