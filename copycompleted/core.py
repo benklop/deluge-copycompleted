@@ -112,46 +112,15 @@ class Core(CorePluginBase):
     def update(self):
         pass
 
-    ## Utils ##
-    def clean_config(self):
-        """remove invalid data from config-file"""
-        for torrent_id, label_id in list(self.torrent_labels.iteritems()):
-            if (not label_id in self.labels) or (not torrent_id in self.torrents):
-                log.debug("label: rm %s:%s" % (torrent_id,label_id))
-                del self.torrent_labels[torrent_id]
-
-    def clean_initial_config(self):
-        """
-        *add any new keys in OPTIONS_DEFAULTS
-        *set all None values to default <-fix development config
-        """
-        log.debug(self.labels.keys())
-        for key in self.labels.keys():
-            options = dict(OPTIONS_DEFAULTS)
-            options.update(self.labels[key])
-            self.labels[key] = options
-
-        for label, options in self.labels.items():
-            for key, value in options.items():
-                if value == None:
-                    self.labels[label][key] = OPTIONS_DEFAULTS[key]
-
-    def save_config(self):
-        self.clean_config()
-        self.config.save()
-
     @export
     def add(self, label_id):
-        """add a torrent copy event
-        see label_set_options for more options.
-        """
+        """add a torrent copy event"""
         label_id = label_id.lower()
         CheckInput(RE_VALID.match(label_id) , _("Invalid label, valid characters:[a-z0-9_-]"))
         CheckInput(label_id, _("Empty Label"))
         CheckInput(not (label_id in self.labels) , _("Label already exists"))
 
         self.labels[label_id] = dict(OPTIONS_DEFAULTS)
-        
         self.config.save()
 
     @export
@@ -159,7 +128,6 @@ class Core(CorePluginBase):
         """remove a label"""
         CheckInput(label_id in self.labels, _("Unknown Label"))
         del self.labels[label_id]
-        self.clean_config()
         self.config.save()
 
     def on_torrent_finished(self, torrent_id):
