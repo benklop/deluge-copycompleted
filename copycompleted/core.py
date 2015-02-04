@@ -52,7 +52,7 @@ from deluge.event import DelugeEvent
 from twisted.internet import reactor
 
 DEFAULT_PREFS = {
-    "labels":{
+    "copy_defs":{
         "No Label":{
             "copy_to" : "",
             "umask" : "",
@@ -86,14 +86,14 @@ class TorrentCopiedEvent(DelugeEvent):
 class Core(CorePluginBase):
     def enable(self):
         self.config = deluge.configmanager.ConfigManager("copycompleted.conf", DEFAULT_PREFS)
-
+	
         # validate settings here as an aid to user
         # don't act differently, as this won't be called again if settings are
         # changed during the session.
-        for label in self.labels:
-            if label["copy_to"].strip() == "" or not os.path.isdir(label["copy_to"]):
+        for copy_def in self.config["copy_defs"].itervalues():
+            if copy_def["copy_to"].strip() == "" or not os.path.isdir(copy_def["copy_to"]):
                 log.error("COPYCOMPLETED: No path to copy to was specified, or that path was invalid. Please amend.")
-
+	
         # Get notified when a torrent finishes downloading
         component.get("EventManager").register_event_handler("TorrentFinishedEvent", self.on_torrent_finished)
         component.get("EventManager").register_event_handler("TorrentCopiedEvent", self.on_torrent_copied)
@@ -119,16 +119,16 @@ class Core(CorePluginBase):
         label_id = label_id.lower()
         CheckInput(RE_VALID.match(label_id) , _("Invalid label, valid characters:[a-z0-9_-]"))
         CheckInput(label_id, _("Empty Label"))
-        CheckInput(not (label_id in self.labels) , _("Label already exists"))
-
-        self.labels[label_id] = dict(OPTIONS_DEFAULTS)
+        CheckInput(not (label_id in self.config["copy_defs"]) , _("Label already exists"))
+	
+        self.config["copy_defs"][label_id] = dict(OPTIONS_DEFAULTS)
         self.config.save()
 
     @export
     def remove(self, label_id):
         """remove a label"""
         CheckInput(label_id in self.labels, _("Unknown Label"))
-        del self.labels[label_id]
+	del self.config["copy_defs"][label_id]
         self.config.save()
 
     def on_torrent_finished(self, torrent_id):
@@ -141,11 +141,10 @@ class Core(CorePluginBase):
         
         if 'Label' in component.get("CorePluginManager").get_enabled_plugins():
             label = component.get("CorePlugin.Label")
-            if label.torrent_label[torrent_id] != "":
-                label_id = label._status_get_label(torrent_id)
+            label_id = label._status_get_label(torrent_id)
         if label_id == "":
             label_id = NO_LABEL
-        options = self.labels[label_id]
+	options = self.config["copy_defs"][label_id]
         
         info = torrent.get_status([ "name", "save_path", "move_on_completed", "move_on_completed_path" ])
         old_path = info["move_on_completed_path"] if info["move_on_completed"] else info["save_path"]
@@ -168,13 +167,13 @@ class Core(CorePluginBase):
         
         if 'Label' in component.get("CorePluginManager").get_enabled_plugins():
             label = component.get("CorePlugin.Label")
-            if label.torrent_label[torrent_id] != "":
-                label_id = label._status_get_label(torrent_id)
+            label_id = label._status_get_label(torrent_id)
         if label_id == "":
             label_id = NO_LABEL
-        options = self.labels[label_id]
         
-        log.debug("COPYCOMPLETED: Torrent Copied Event: %s, %s, %s, %s", torrent_id, old_path, new_path, path_pairs)
+	options = self.config["copy_defs"][label_id]
+	
+	debug("COPYCOMPLETED: Torrent Copied Event: %s, %s, %s, %s", torrent_id, old_path, new_path, path_pairs)
         if options["move_to"] and path_pairs:
             log.debug("COPYCOMPLETED: Attempting Move To Path")
             torrent = component.get("TorrentManager").torrents[torrent_id]
