@@ -90,8 +90,9 @@ class Core(CorePluginBase):
         # validate settings here as an aid to user
         # don't act differently, as this won't be called again if settings are
         # changed during the session.
-        if self.config["copy_to"].strip() == "" or not os.path.isdir(self.config["copy_to"]):
-            log.error("COPYCOMPLETED: No path to copy to was specified, or that path was invalid. Please amend.")
+        for label in self.labels:
+            if label["copy_to"].strip() == "" or not os.path.isdir(label["copy_to"]):
+                log.error("COPYCOMPLETED: No path to copy to was specified, or that path was invalid. Please amend.")
 
         # Get notified when a torrent finishes downloading
         component.get("EventManager").register_event_handler("TorrentFinishedEvent", self.on_torrent_finished)
@@ -164,8 +165,17 @@ class Core(CorePluginBase):
         """
         Remove old path if option enabled
         """
+        
+        if 'Label' in component.get("CorePluginManager").get_enabled_plugins():
+            label = component.get("CorePlugin.Label")
+            if label.torrent_label[torrent_id] != "":
+                label_id = label._status_get_label(torrent_id)
+        if label_id == "":
+            label_id = NO_LABEL
+        options = self.labels[label_id]
+        
         log.debug("COPYCOMPLETED: Torrent Copied Event: %s, %s, %s, %s", torrent_id, old_path, new_path, path_pairs)
-        if self.config["move_to"] and path_pairs:
+        if options["move_to"] and path_pairs:
             log.debug("COPYCOMPLETED: Attempting Move To Path")
             torrent = component.get("TorrentManager").torrents[torrent_id]
             files = torrent.get_files()
